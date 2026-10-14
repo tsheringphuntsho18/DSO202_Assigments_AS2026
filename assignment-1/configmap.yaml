@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-tracker-config
+  namespace: dso202-assignment-01
+data:
+  DB_HOST: "task-database"
+  DB_PORT: "5432"
+  DB_NAME: "taskdb"
+  APP_PORT: "8080"
+  CORS_ORIGIN: "http://localhost:30080"
+  POSTGRES_DB: "taskdb"
+  BACKEND_URL: "http://localhost:32081"

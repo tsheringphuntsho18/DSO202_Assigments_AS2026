@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-frontend
+  namespace: dso202-assignment-01
+  labels:
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-frontend
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: task-frontend
+        tier: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: pulu18/taskfrontend:1.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/docker-entrypoint.sh"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: task-tracker-config
+                  key: BACKEND_URL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
