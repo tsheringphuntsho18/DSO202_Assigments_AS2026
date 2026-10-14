@@ -20,18 +20,21 @@ ConfigMap stores non-sensitive settings. Secret stores database credential value
 
 `configmap.yaml` contains non-sensitive settings: `DB_HOST`, `DB_PORT`, `DB_NAME`, `APP_PORT`, `CORS_ORIGIN`, `POSTGRES_DB`, and `BACKEND_URL`.
 
-`secret.yaml` contains only the credential keys: `DB_USER`, `DB_PASSWORD`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. The placeholder strings are deliberately invalid until replaced with base64-encoded values.
+`secret.yaml` contains only the credential keys: `DB_USER`, `DB_PASSWORD`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. 
 
-Generate each encoded value locally, for example:
+Generate each encoded value locally:
 
 ```bash
-printf '%s' 'REPLACE_WITH_YOUR_DB_USER' | base64
-printf '%s' 'REPLACE_WITH_YOUR_DB_PASSWORD' | base64
+printf '%s' 'dbuser' | base64
+printf '%s' 'dbpassword' | base64
 ```
 
 Copy the outputs into the matching keys in `secret.yaml`. Use the same database username and password for `DB_USER`/`POSTGRES_USER` and `DB_PASSWORD`/`POSTGRES_PASSWORD`, respectively. Do not put actual plaintext credentials in Git. Base64 is encoding, not encryption. Kubernetes Secrets are **base64-encoded and are not encrypted at rest by default**; access controls and cluster encryption configuration are separate concerns.
 
 ### ResourceQuota and LimitRange justification
+
+![image](screenshots/02-quota.png)
+**Figure-1:** ResourceQuota and limitRange
 
 The ResourceQuota sets a namespace ceiling of 1.5 CPU cores and 1536 MiB of requested memory, with maximum aggregate limits of 3 CPU cores and 3 GiB memory. It also caps the namespace at 10 Pods and 2 PVCs. These are modest local-development limits intended to prevent this assignment from consuming the whole workstation while leaving room for the three single-replica tiers.
 
@@ -56,6 +59,9 @@ assignment-1/
 ├── frontend/
 │   ├── deployment.yaml
 │   └── service.yaml
+├── screenshots
+│   ├── ...
+│   └── ...
 └── README.md
 ```
 
@@ -96,6 +102,10 @@ kubectl rollout status deployment/task-frontend -n dso202-assignment-01
 
 If a rollout fails, inspect `kubectl describe pod`, `kubectl logs`, PVC status, and namespace events before proceeding.
 
+**Kubernetes configuration**
+![image](screenshots/01-resources.png)
+**Figure-2:** Resources
+
 ## 6. Access the frontend
 
 If kind has host mappings for ports `30080` and `32081`, open:
@@ -117,10 +127,13 @@ In another terminal, forward the backend as well:
 ```bash
 kubectl port-forward service/backend-service-external 32081:5000 -n dso202-assignment-01
 ```
+![image](screenshots/s1.png)
+**Figure-3:** Port Forwarding
 
 Then open `http://localhost:8080`.
 
-**Evidence placeholder:** [INSERT SCREENSHOT: Task Tracker frontend running]
+![image](screenshots/task-tracker-frontend.png)
+**Figure-4:** Frontend UI
 
 ## 7. Required evidence — Task 7
 
@@ -128,26 +141,12 @@ Then open `http://localhost:8080`.
 
 Use the frontend to create a task, list it, update it, and delete it. Record the actual task ID and results.
 
-- [INSERT SCREENSHOT/TERMINAL TRANSCRIPT: task created]
-- [INSERT SCREENSHOT/TERMINAL TRANSCRIPT: task listed]
-- [INSERT SCREENSHOT/TERMINAL TRANSCRIPT: task updated]
-- [INSERT SCREENSHOT/TERMINAL TRANSCRIPT: task deleted]
+![image](screenshots/03-create-list.png)
+**Figure-5:** Task Created
 
-The guide documents these backend endpoints: `GET /api/tasks`, `GET /api/tasks/{id}`, `POST /api/tasks`, `PUT /api/tasks/{id}`, `DELETE /api/tasks/{id}`, and `GET /api/status`. If demonstrating with curl, first port-forward the backend:
+The guide documents these backend endpoints: `GET /api/tasks`, `GET /api/tasks/{id}`, `POST /api/tasks`, `PUT /api/tasks/{id}`, `DELETE /api/tasks/{id}`, and `GET /api/status`. 
 
-```bash
-kubectl port-forward service/task-backend 18080:8080 -n dso202-assignment-01
-```
-
-In another terminal, use the API's actual request-body schema. Example placeholders below must be adapted to the API response/schema:
-
-```bash
-curl -i http://localhost:18080/api/tasks
-# PLACEHOLDER: POST request with the required JSON body
-# PLACEHOLDER: GET the created task by its returned ID
-# PLACEHOLDER: PUT updated JSON for that ID
-# PLACEHOLDER: DELETE that ID
-```
+Like this I have updated and deleted the created task.
 
 ### 7b. Service DNS resolution from the frontend Pod
 
@@ -158,7 +157,8 @@ kubectl exec -n dso202-assignment-01 deploy/task-frontend --   wget -S -O- http:
 
 If the frontend image does not contain `wget` or the command is unavailable, use an available client in the image or document an approved alternative. The frontend image also requires the explicit shell command and runtime settings shown in `frontend/deployment.yaml` because its published `nginx` user is not resolvable by the cluster runtime. Save the output as evidence.
 
-- [INSERT SCREENSHOT: command run from frontend Pod and successful backend response]
+![image](screenshots/06-service-dns.png)
+**Figure-6:** command run from frontend Pod and successful backend response
 
 ### 7c. Self-healing and data persistence
 
@@ -177,12 +177,15 @@ kubectl delete pod [BACKEND_POD_NAME] -n dso202-assignment-01
 
 After the replacement Pod is Ready, retrieve the task created before deletion using the frontend or backend API.
 
-- [INSERT SCREENSHOT: old backend Pod deleted and replacement created]
-- [INSERT SCREENSHOT: task created before deletion is still retrievable]
+![pod delete](screenshots/podDelete.png)
+**Figure-7:** old backend Pod deleted
+
+![image](screenshots/07-self-healing.png)
+**Figure-8:** old backend Pod deleted and replacement created
 
 The persistence test should demonstrate database storage surviving backend Pod replacement. The PVC itself is mounted by the database Pod; for the strongest evidence, also verify task data survives database Pod replacement without deleting the PVC.
 
-### 7d. Declarative versus imperative
+### 7d. Declarative vs. Imperative Resource Creation
 
 The namespace is created declaratively in this submission:
 
@@ -198,10 +201,18 @@ kubectl get namespace dso202-imperative-demo
 kubectl delete namespace dso202-imperative-demo
 ```
 
-**Comparison:** Declarative management uses YAML to describe the desired state; `kubectl apply -f` creates or updates resources and makes the configuration reviewable and version-controllable. Imperative commands directly request an operation and are convenient for quick one-off actions, but the full desired configuration is less visible and repeatable unless commands are recorded. The two approaches are equivalent here in the outcome of creating a namespace, but use different workflows.
+**Declarative approach:** A YAML manifest describes the desired state of a Kubernetes resource. The resource is created or updated using `kubectl apply -f`. The manifest can be stored in version control, reviewed, reused, and applied repeatedly to reconcile the resource with the declared configuration.
 
-- [INSERT SCREENSHOT/TRANSCRIPT: declarative command]
-- [INSERT SCREENSHOT/TRANSCRIPT: imperative command]
+![image](screenshots/09-declarative.png)
+**Figure-9:** declarative
+
+**Imperative approach:** A command such as `kubectl create configmap` specifies the resource and its configuration directly in the terminal. This is convenient for quick, one-time operations, but the command itself does not provide the same persistent desired-state file as a declarative manifest.
+![image](screenshots/10-imperative.png)
+**Figure-10:** imperative
+
+**Conclusion:** The declarative approach is preferable for the main assignment because the YAML manifests document the application's configuration and make deployment repeatable. Imperative commands remain useful for temporary tasks, troubleshooting, and quick demonstrations.
+
+
 
 ## 8. Troubleshooting
 
@@ -214,17 +225,4 @@ kubectl delete namespace dso202-imperative-demo
 - **NodePort not reachable:** verify kind `extraPortMappings` contains both `30080` and `32081`; recreate the kind cluster after changing its configuration, or use port-forwarding.
 - **Quota blocks creation:** inspect `kubectl describe resourcequota assignment-quota -n dso202-assignment-01`.
 
-## 9. Submission checklist
 
-- [ ] Replace student and cluster placeholders.
-- [ ] Replace Secret placeholders and verify credentials match.
-- [ ] Verify all three exact image tags.
-- [ ] Verify every Pod, Deployment, and Service has the appropriate `tier` label.
-- [ ] Verify frontend NodePort `30080`, backend ClusterIP, backend external NodePort `32081`, and database headless Service.
-- [ ] Verify PVC is Bound and database data path is correct.
-- [ ] Verify ResourceQuota and LimitRange.
-- [ ] Capture real CRUD evidence.
-- [ ] Capture Service DNS evidence from the frontend Pod.
-- [ ] Capture backend self-healing and persistence evidence.
-- [ ] Capture declarative/imperative comparison evidence.
-- [ ] Commit the YAML files and completed README to the designated repository.
