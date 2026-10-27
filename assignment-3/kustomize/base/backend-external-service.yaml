@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service-external
+spec:
+  type: NodePort
+  selector:
+    tier: backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 8080
+      nodePort: 32081

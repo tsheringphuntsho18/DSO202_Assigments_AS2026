@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-tracker.fullname" . }}-frontend
+  labels:
+    tier: frontend
+    {{- include "task-tracker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "frontend") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}{{ if .Values.frontend.image.digest }}@{{ .Values.frontend.image.digest }}{{ else }}:{{ .Values.frontend.image.tag }}{{ end }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          command: ["/bin/sh", "/docker-entrypoint.sh"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+          env:
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-tracker.configName" . }}
+                  key: BACKEND_URL
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-tracker.fullname" . }}-frontend
+  labels:
+    tier: frontend
+    {{- include "task-tracker.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  selector: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "frontend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.containerPort }}
+      nodePort: {{ .Values.frontend.service.nodePort }}

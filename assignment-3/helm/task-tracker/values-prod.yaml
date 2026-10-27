@@ -1,0 +1,19 @@
+frontend:
+  replicaCount: 2
+  service:
+    nodePort: 30081
+backend:
+  replicaCount: 2
+  external:
+    nodePort: 32082
+config:
+  corsOrigin: http://localhost:8081
+  backendUrl: http://localhost:32082
+quota:
+  hard:
+    requests.cpu: "3"
+    requests.memory: "3Gi"
+    limits.cpu: "6"
+    limits.memory: "6Gi"
+    pods: "15"
+    persistentvolumeclaims: "2"
