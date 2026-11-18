@@ -13,12 +13,6 @@
 # capability, and warns that a project allowed to deploy into the Argo CD
 # namespace has effectively administrator rights. Only this project is allowed
 # to target the 'argocd' namespace.
-#
-# Repository note: this assignment's files live under assignment-4/ inside the
-# combined multi-assignment repository DSO202_Assigments_AS2026, rather than
-# in a dedicated dso202-gitops repository. sourceRepos names that repository;
-# every Application's path (below and in argocd/applications/) is prefixed
-# with assignment-4/ accordingly.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

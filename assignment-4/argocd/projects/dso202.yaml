@@ -6,12 +6,6 @@
 #               to one repository, two namespaces, and an explicit list of
 #               resource kinds. A manifest outside these limits is rejected at
 #               sync time, whoever committed it.
-#
-# Whitelist derivation (Task 3, step 1): 'helm template' against both
-# environments (Task 1, step 6) renders exactly ConfigMap, Deployment, Job,
-# PersistentVolumeClaim and Service - no more, no less. PersistentVolumeClaim
-# is added below with a comment, as the brief allows; StatefulSet and
-# ServiceAccount are left out because this chart renders neither.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

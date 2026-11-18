@@ -26,3 +26,4 @@ resources:
 patches:
   - path: argocd-cm-patch.yaml
   - path: argocd-rbac-cm-patch.yaml
+  - path: repo-server-git-transport-patch.yaml

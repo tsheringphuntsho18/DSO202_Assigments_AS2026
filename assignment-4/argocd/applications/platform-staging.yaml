@@ -1,0 +1,40 @@
+# =============================================================================
+# File        : argocd/applications/platform-staging.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.1 - Application CRDs; 4.3.2 - sync policies
+# Purpose     : Delivers the platform objects and sealed credentials for the
+#               staging environment.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+    targetRevision: main
+    path: assignment-4/platform/staging
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
