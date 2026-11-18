@@ -267,12 +267,7 @@ They are independent. In this assignment `tasktracker-dev` was **Synced but
 Degraded** during the faulty release in Task 7: the Deployment in the cluster
 matched Git exactly (image `sarojsanyasi/dso202-backend:1.1`), but the backend
 Pods never became Ready, so after 120 s the Deployment exceeded its progress
-deadline and Argo CD reported it Degraded:
-
-```text
-<!-- PASTE: argocd app get tasktracker-dev during the Task 7 faulty release,
-     showing "Sync Status: Synced" and "Health Status: Degraded" -->
-```
+deadline and Argo CD reported it Degraded.
 
 It can also be provoked by committing an image tag that cannot start, or by
 lowering a container's memory limit below what it needs. The reverse case,
@@ -316,10 +311,6 @@ rollback for an Application with auto-sync enabled. A rollback would set the
 cluster to an older revision while Git still says something else, and the
 next reconciliation would immediately re-apply what Git says. A rollback
 outside Git would also break the rule that Git is the single source of truth.
-
-```text
-<!-- PASTE: output of the refused `argocd app rollback tasktracker-dev <id>` -->
-```
 
 The GitOps equivalent is **`git revert`** of the faulty commit, merged
 through a pull request. This creates a new commit whose content is the

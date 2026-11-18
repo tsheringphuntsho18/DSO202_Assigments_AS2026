@@ -33,8 +33,9 @@ $ helm repo add sealed-secrets https://bitnami.github.io/sealed-secrets
 $ helm repo update
 $ helm search repo sealed-secrets/sealed-secrets --versions | head -5
 ```
-![image](s1)  
-![image](s2)  
+![image](../screenshots/s1.png)  
+
+![image](../screenshots/s2.png)  
 
 ### Chart contract (C1–C11)
 
@@ -201,7 +202,7 @@ $ argocd login localhost:8080 --username admin --insecure
 'admin:login' logged in successfully
 Context 'localhost:8080' updated
 ```
-![image](task2-argo)  
+![image](../screenshots/task2-argo.png)  
 
 ### Local settings confirmation (step 6)
 
@@ -215,8 +216,8 @@ $ argocd version
 argocd: v3.5.6+c2b1e30
 argocd-server: v3.5.6
 ```
-![image](task2-commands)  
-![image](task2-password)    
+![image](../screenshots/task2-commands.png)  
+![image](../screenshots/task2-password.png)    
 
 ## Task 3 — AppProjects and the Root Application
 
@@ -264,7 +265,7 @@ Denied Namespaced Resources: <none>
 Signature keys:              <none>
 Orphaned Resources:          disabled
 ```
-![image](task3)  
+![image](../screenshots/task3.png)  
 
 ### Final `dso202` whitelist
 
@@ -289,14 +290,41 @@ absent; they belong to the `platform` project.
 
 ```text
 $ argocd app get sealed-secrets
-{"level":"fatal","msg":"rpc error: code = PermissionDenied desc = permission denied","time":"2026-11-18T22:49:22+06:00"}
+Name:               argocd/sealed-secrets
+Project:            platform
+Server:             https://kubernetes.default.svc
+Namespace:          sealed-secrets
+URL:                https://localhost:8080/applications/sealed-secrets
+Source:
+- Repo:             https://bitnami.github.io/sealed-secrets
+  Target:           2.20.0
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        Synced to 2.20.0
+Health Status:      Healthy
+
+GROUP                      KIND                      NAMESPACE       NAME                                       STATUS  HEALTH   HOOK  MESSAGE
+                           Service                   sealed-secrets  sealed-secrets-controller                  Synced  Healthy        service/sealed-secrets-controller configured
+                           Service                   sealed-secrets  sealed-secrets-controller-metrics          Synced  Healthy        service/sealed-secrets-controller-metrics configured
+apps                       Deployment                sealed-secrets  sealed-secrets-controller                  Synced  Healthy        deployment.apps/sealed-secrets-controller configured
+                           ServiceAccount            sealed-secrets  sealed-secrets-controller                  Synced                 
+apiextensions.k8s.io       CustomResourceDefinition                  sealedsecrets.bitnami.com                  Synced  Healthy        
+rbac.authorization.k8s.io  ClusterRole                               secrets-unsealer                           Synced                 
+rbac.authorization.k8s.io  ClusterRoleBinding                        sealed-secrets-controller                  Synced                 
+rbac.authorization.k8s.io  Role                      sealed-secrets  sealed-secrets-controller-key-admin        Synced                 
+rbac.authorization.k8s.io  Role                      sealed-secrets  sealed-secrets-controller-service-proxier  Synced                 
+rbac.authorization.k8s.io  RoleBinding               sealed-secrets  sealed-secrets-controller-key-admin        Synced                 
+rbac.authorization.k8s.io  RoleBinding               sealed-secrets  sealed-secrets-controller-service-proxier  Synced  
 
 $ kubectl get pods -n sealed-secrets
-No resources found in sealed-secrets namespace.
+NAME                                        READY   STATUS    RESTARTS   AGE
+sealed-secrets-controller-8b5ffdf69-pjc7r   1/1     Running   0          6m3s
 
 $ kubectl get crd sealedsecrets.bitnami.com
-Error from server (NotFound): customresourcedefinitions.apiextensions.k8s.io "sealedsecrets.bitnami.com" not found
+NAME                        CREATED AT
+sealedsecrets.bitnami.com   2026-11-18T19:17:33Z
 ```
+![image](../screenshots/task4.png)
 
 ### Sealing-key backup (existence and permissions only)
 
@@ -313,10 +341,18 @@ The key's contents are never shown. A second copy is kept offline.
 
 ```text
 $ kubectl get sealedsecret,secret -n dso202-dev
-error: the server doesn't have a resource type "sealedsecret"
+NAME                                               STATUS   SYNCED   AGE
+sealedsecret.bitnami.com/tasktracker-credentials            True     5m17s
+
+NAME                             TYPE     DATA   AGE
+secret/tasktracker-credentials   Opaque   4      5m17s
 
 $ kubectl get sealedsecret,secret -n dso202-staging
-error: the server doesn't have a resource type "sealedsecret"
+NAME                                               STATUS   SYNCED   AGE
+sealedsecret.bitnami.com/tasktracker-credentials            True     9m50s
+
+NAME                             TYPE     DATA   AGE
+secret/tasktracker-credentials   Opaque   4      9m50s
 ```
 
 ### Step 7: plaintext searches (keys tested, not values)
@@ -344,78 +380,13 @@ $ argocd app list
 NAME         CLUSTER                         NAMESPACE  PROJECT   STATUS   HEALTH   SYNCPOLICY  CONDITIONS       REPO                                           PATH                 TARGET
 argocd/root  https://kubernetes.default.svc  argocd     platform  Unknown  Healthy  Auto-Prune  ComparisonError  https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/argocd  main
 ```
+![image](../screenshots/ui.png)
 
 ## Task 5 — Deliver the Workloads to dev and staging
 
-### Pod creation order (step 4)
+![iamge](../screenshots/task5-a.png)    
 
-```text
-$ kubectl get pods -n dso202-dev -w     # or: kubectl get events -n dso202-dev --sort-by=.metadata.creationTimestamp
-<!-- PASTE OUTPUT: database pod first, then backend, then frontend, then the smoke-test Job pod -->
-```
-
-Order observed: database (wave 0) → backend (wave 1) → frontend (wave 2) → smoke test (PostSync).
-
-### Smoke-test Job log
-
-```text
-$ kubectl logs job/tasktracker-dev-smoke-test -n dso202-dev
-<!-- PASTE OUTPUT -->
-```
-
-### `argocd app get` for both environments
-
-```text
-$ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: Synced to main (<sha>), Healthy -->
-
-$ argocd app get tasktracker-staging
-<!-- PASTE OUTPUT: Synced to v1.0.0 (<sha>), Healthy -->
-```
-
-### Root Application before and after the first staging sync
-
-```text
-# before
-$ argocd app get root
-$ argocd app get tasktracker-staging
-<!-- PASTE OUTPUT: tasktracker-staging OutOfSync / Missing; root not fully Healthy -->
-
-$ argocd app sync tasktracker-staging && argocd app wait tasktracker-staging --health
-
-# after
-$ argocd app get root
-<!-- PASTE OUTPUT: root Synced / Healthy -->
-```
-
-### All Applications
-
-```text
-$ kubectl get applications -n argocd
-<!-- PASTE OUTPUT: every Application Synced and Healthy -->
-```
-
-### Full CRUD cycle in dev
-
-```text
-$ kubectl port-forward svc/tasktracker-dev-backend -n dso202-dev 5000:8080 &
-$ curl -s -X POST localhost:5000/api/tasks -H 'Content-Type: application/json' -d '{"title":"evidence task"}'   # Create
-$ curl -s localhost:5000/api/tasks                                                                              # Read
-$ curl -s -X PUT localhost:5000/api/tasks/<id> -H 'Content-Type: application/json' -d '{"title":"evidence task","completed":true}'   # Update
-$ curl -s -X DELETE localhost:5000/api/tasks/<id>                                                               # Delete
-$ curl -s localhost:5000/api/tasks
-<!-- PASTE OUTPUT of each call (use the field names your backend expects) -->
-```
-
-<!-- SCREENSHOT (optional): the Task Tracker UI at http://localhost:30080 with the test task -->
-
-### `tasktracker-dev` resource tree
-
-<!-- SCREENSHOT: Argo CD UI → tasktracker-dev → resource tree -->
-
-Q3: see README §6.
-
----
+![image](../screenshots/task5-b.png)
 
 ## Task 6 — Access Control for Argo CD Users
 
@@ -423,7 +394,9 @@ Q3: see README §6.
 
 ```text
 $ argocd account list
-<!-- PASTE OUTPUT: admin (login), reviewer (login) -->
+NAME      ENABLED  CAPABILITIES
+admin     true     login
+reviewer  true     login
 ```
 
 ### Step 3: reviewer permission checks (signed in as reviewer)
@@ -431,77 +404,115 @@ $ argocd account list
 ```text
 $ argocd login localhost:8080 --username reviewer --insecure
 $ argocd app list
-<!-- PASTE OUTPUT: only tasktracker-dev and tasktracker-staging -->
+NAME                        CLUSTER                         NAMESPACE       PROJECT   STATUS     HEALTH       SYNCPOLICY  CONDITIONS  REPO                                                                PATH                             TARGET
+argocd/platform-dev         https://kubernetes.default.svc  dso202-dev      platform  Synced     Healthy      Auto-Prune  <none>      https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/platform/dev        main
+argocd/platform-staging     https://kubernetes.default.svc  dso202-staging  platform  Synced     Healthy      Auto-Prune  <none>      https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/platform/staging    main
+argocd/root                 https://kubernetes.default.svc  argocd          platform  Synced     Degraded     Auto-Prune  <none>      https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/argocd              main
+argocd/sealed-secrets       https://kubernetes.default.svc  sealed-secrets  platform  Synced     Healthy      Auto-Prune  <none>      https://bitnami.github.io/sealed-secrets                                                             2.20.0
+argocd/tasktracker-dev      https://kubernetes.default.svc  dso202-dev      dso202    OutOfSync  Degraded     Auto-Prune  SyncError   https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/charts/tasktracker  main
+argocd/tasktracker-staging  https://kubernetes.default.svc  dso202-staging  dso202    OutOfSync  Progressing  Manual      <none>      https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git  assignment-4/charts/tasktracker  v1.0.0
 
 $ argocd app get root
-<!-- PASTE OUTPUT: permission denied -->
+Name:               argocd/root
+Project:            platform
+Server:             https://kubernetes.default.svc
+Namespace:          argocd
+URL:                https://localhost:8080/applications/root
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           main
+  Path:             assignment-4/argocd
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        Synced to main (04eb001)
+Health Status:      Degraded
+
+GROUP        KIND         NAMESPACE  NAME                 STATUS  HEALTH       HOOK  MESSAGE
+argoproj.io  Application  argocd     sealed-secrets       Synced  Healthy            application.argoproj.io/sealed-secrets configured
+argoproj.io  Application  argocd     platform-dev         Synced  Healthy            application.argoproj.io/platform-dev created
+argoproj.io  Application  argocd     platform-staging     Synced  Healthy            application.argoproj.io/platform-staging configured
+argoproj.io  Application  argocd     tasktracker-dev      Synced  Degraded           application.argoproj.io/tasktracker-dev created
+argoproj.io  Application  argocd     tasktracker-staging  Synced  Progressing        application.argoproj.io/tasktracker-staging created
+argoproj.io  AppProject   argocd     dso202               Synced        
 
 $ argocd app sync tasktracker-dev
-<!-- PASTE OUTPUT: permission denied -->
-
-$ argocd account can-i sync applications 'dso202/*'
-<!-- PASTE OUTPUT: no -->
+TIMESTAMP                  GROUP        KIND              NAMESPACE                  NAME            STATUS    HEALTH         HOOK  MESSAGE
+2026-11-19T02:11:12+06:00          ConfigMap             dso202-dev    tasktracker-config            Synced                         
+2026-11-19T02:11:12+06:00         PersistentVolumeClaim  dso202-dev  tasktracker-database-pvc        Synced   Healthy               
+2026-11-19T02:11:12+06:00            Service             dso202-dev  tasktracker-frontend            Synced   Healthy               
+2026-11-19T02:11:12+06:00   apps  Deployment             dso202-dev   tasktracker-backend          OutOfSync  Missing               
+2026-11-19T02:11:12+06:00   apps  Deployment             dso202-dev  tasktracker-database            Synced   Degraded              
+2026-11-19T02:11:12+06:00            Service             dso202-dev   tasktracker-backend            Synced   Healthy               
+2026-11-19T02:11:12+06:00            Service             dso202-dev  tasktracker-backend-external    Synced   Healthy               
+2026-11-19T02:11:12+06:00            Service             dso202-dev  tasktracker-database            Synced   Healthy               
+2026-11-19T02:11:12+06:00   apps  Deployment             dso202-dev  tasktracker-frontend          OutOfSync  Missing               
+2026-11-19T02:11:14+06:00          ConfigMap             dso202-dev    tasktracker-config            Synced                        configmap/tasktracker-config unchanged
+2026-11-19T02:11:14+06:00         PersistentVolumeClaim  dso202-dev  tasktracker-database-pvc        Synced  Healthy               persistentvolumeclaim/tasktracker-database-pvc unchanged
+2026-11-19T02:11:14+06:00   apps  Deployment             dso202-dev  tasktracker-database            Synced  Degraded              deployment.apps/tasktracker-database unchanged
+2026-11-19T02:11:14+06:00            Service             dso202-dev  tasktracker-backend-external    Synced  Healthy               service/tasktracker-backend-external unchanged
+2026-11-19T02:11:14+06:00            Service             dso202-dev  tasktracker-database            Synced  Healthy               service/tasktracker-database unchanged
+2026-11-19T02:11:14+06:00            Service             dso202-dev   tasktracker-backend            Synced  Healthy               service/tasktracker-backend unchanged
+2026-11-19T02:11:14+06:00            Service             dso202-dev  tasktracker-frontend            Synced  Healthy               service/tasktracker-frontend unchanged
+2026-11-19T02:11:14+06:00   apps  Deployment  dso202-dev  tasktracker-database    Synced  Degraded              Deployment "tasktracker-database" exceeded its progress deadline
 ```
-
-### Step 4: log access before and after the RBAC change
-
-```text
-# before (logs line commented out)
-$ argocd app logs tasktracker-dev --kind Deployment --name tasktracker-dev-backend --tail 5
-<!-- PASTE OUTPUT: permission denied -->
-
-# change: uncommented `p, reviewer, logs, get, dso202/*, allow`
-# commit <sha>, then (bootstrap layer, not Argo-managed):
-$ kubectl apply -k bootstrap/argocd --server-side --force-conflicts
-
-# after
-$ argocd app logs tasktracker-dev --kind Deployment --name tasktracker-dev-backend --tail 5
-<!-- PASTE OUTPUT: log lines -->
-```
-
-<!-- SCREENSHOT: UI signed in as reviewer, a backend Pod's LOGS tab visible -->
-
-Q4: see README §6.
-
----
-
 ## Task 7 — A Release, a Faulty Release, and Recovery
-
-### Pull requests
-
-<!-- SCREENSHOT or list: GitHub → Pull requests → Closed, showing every Task 7 PR (titles and numbers) -->
 
 ### Step 5: dev during the faulty release (backend 1.1)
 
 ```text
 $ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: Synced, Health Degraded (backend Deployment) -->
+Name:               argocd/tasktracker-dev
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-dev
+URL:                https://localhost:8080/applications/tasktracker-dev
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           main
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/dev/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        OutOfSync from main (04eb001)
+Health Status:      Degraded
 
-$ kubectl get pods -n dso202-dev
-<!-- PASTE OUTPUT: backend pod CrashLoopBackOff / 0/1 Ready -->
+GROUP  KIND                   NAMESPACE   NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-dev  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-dev  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-dev  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-dev  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+       Service                dso202-dev  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+       Service                dso202-dev  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+apps   Deployment             dso202-dev  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-dev  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-dev  tasktracker-frontend          OutOfSync  Missing  
 
 $ argocd app get tasktracker-staging
-<!-- PASTE OUTPUT: unaffected, still on v1.1.0, Healthy (the gate worked) -->
-```
+Name:               argocd/tasktracker-staging
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-staging
+URL:                https://localhost:8080/applications/tasktracker-staging
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           v1.0.0
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/staging/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Manual
+Sync Status:        OutOfSync from v1.0.0 (30cd172)
+Health Status:      Degraded
 
-Observations: <!-- WRITE: what you saw, e.g. old backend ReplicaSet kept
-serving while the new Pod failed; Degraded after the 120 s progress deadline -->
-
-### Step 6: the log line that identifies the cause
-
-```text
-$ kubectl logs deploy/tasktracker-dev-backend -n dso202-dev --previous
-<!-- PASTE the relevant log line(s) -->
-```
-
-Cause: <!-- WRITE: e.g. the 1.1 backend reads <VAR> instead of <OLD_VAR> -->
-
-### Step 7: refused rollback
-
-```text
-$ argocd app history tasktracker-dev
-$ argocd app rollback tasktracker-dev <id>
-<!-- PASTE OUTPUT: refused because auto-sync is enabled -->
+GROUP  KIND                   NAMESPACE       NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-staging  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-staging  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-staging  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+       Service                dso202-staging  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-staging  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+       Service                dso202-staging  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+apps   Deployment             dso202-staging  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-staging  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-staging  tasktracker-frontend          OutOfSync  Missing         
 ```
 
 ### Steps 8–10: state after revert, fix-forward and promotion
@@ -509,129 +520,241 @@ $ argocd app rollback tasktracker-dev <id>
 ```text
 # after git revert (step 8)
 $ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: Synced, Healthy, backend 1.0 -->
+Name:               argocd/tasktracker-dev
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-dev
+URL:                https://localhost:8080/applications/tasktracker-dev
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           main
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/dev/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        OutOfSync from main (04eb001)
+Health Status:      Degraded
+
+GROUP  KIND                   NAMESPACE   NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-dev  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-dev  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-dev  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+       Service                dso202-dev  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-dev  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+       Service                dso202-dev  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+apps   Deployment             dso202-dev  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-dev  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-dev  tasktracker-frontend          OutOfSync  Missing    
 
 # after fix-forward (step 9)
 $ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: Synced, Healthy, backend 1.1 + extraEnv -->
+Name:               argocd/tasktracker-dev
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-dev
+URL:                https://localhost:8080/applications/tasktracker-dev
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           main
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/dev/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        OutOfSync from main (04eb001)
+Health Status:      Degraded
+
+GROUP  KIND                   NAMESPACE   NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-dev  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-dev  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-dev  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+       Service                dso202-dev  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-dev  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+       Service                dso202-dev  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+apps   Deployment             dso202-dev  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-dev  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-dev  tasktracker-frontend          OutOfSync  Missing  
 
 # after promotion to v1.2.0 (step 10)
 $ argocd app sync tasktracker-staging
 $ argocd app get tasktracker-staging
-<!-- PASTE OUTPUT: Synced to v1.2.0, Healthy -->
+Name:               argocd/tasktracker-staging
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-staging
+URL:                https://localhost:8080/applications/tasktracker-staging
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           v1.0.0
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/staging/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Manual
+Sync Status:        OutOfSync from v1.0.0 (30cd172)
+Health Status:      Degraded
+
+GROUP  KIND                   NAMESPACE       NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-staging  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-staging  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-staging  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-staging  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+       Service                dso202-staging  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+       Service                dso202-staging  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+apps   Deployment             dso202-staging  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-staging  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-staging  tasktracker-frontend          OutOfSync  Missing 
 ```
-
-### History
-
-```text
-$ git log --oneline --graph --decorate -n 15
-<!-- PASTE OUTPUT: shows tags v1.0.0, v1.1.0, v1.2.0 and the Revert commit -->
-
-$ argocd app history tasktracker-dev
-<!-- PASTE OUTPUT -->
-
-$ argocd app history tasktracker-staging
-<!-- PASTE OUTPUT: v1.0.0 → v1.1.0 → v1.2.0 -->
-```
-
-Q5: see README §6.
-
----
 
 ## Task 8 — Drift, Pruning and Project Guardrails
 
-### Drill 1: self-heal in dev
-
-**Prediction (written before running):** <!-- WRITE -->
-
-```text
-$ kubectl scale deploy tasktracker-dev-frontend -n dso202-dev --replicas=3
-$ kubectl get deploy tasktracker-dev-frontend -n dso202-dev -w
-<!-- PASTE OUTPUT: 3 → back to 1 within seconds -->
-$ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT -->
-```
-
-**Result:** <!-- WRITE one sentence: held / did not hold, explained by selfHeal: true -->
-
 ### Drill 2: drift reported, not corrected, in staging
 
-**Prediction:** <!-- WRITE -->
+**Prediction:**
 
 ```text
 $ kubectl scale deploy tasktracker-staging-frontend -n dso202-staging --replicas=3
 $ argocd app get tasktracker-staging
-<!-- PASTE OUTPUT: OutOfSync, Healthy, still 3 replicas -->
+Name:               argocd/tasktracker-staging
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-staging
+URL:                https://localhost:8080/applications/tasktracker-staging
+Source:
+- Repo:             https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+  Target:           v1.0.0
+  Path:             assignment-4/charts/tasktracker
+  Helm Values:      ../../environments/staging/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Manual
+Sync Status:        OutOfSync from v1.0.0 (30cd172)
+Health Status:      Degraded
+
+GROUP  KIND                   NAMESPACE       NAME                          STATUS     HEALTH    HOOK  MESSAGE
+       ConfigMap              dso202-staging  tasktracker-config            Synced                     configmap/tasktracker-config unchanged
+       PersistentVolumeClaim  dso202-staging  tasktracker-database-pvc      Synced     Healthy         persistentvolumeclaim/tasktracker-database-pvc unchanged
+       Service                dso202-staging  tasktracker-backend-external  Synced     Healthy         service/tasktracker-backend-external unchanged
+       Service                dso202-staging  tasktracker-frontend          Synced     Healthy         service/tasktracker-frontend unchanged
+       Service                dso202-staging  tasktracker-database          Synced     Healthy         service/tasktracker-database unchanged
+       Service                dso202-staging  tasktracker-backend           Synced     Healthy         service/tasktracker-backend unchanged
+apps   Deployment             dso202-staging  tasktracker-database          Synced     Degraded        Deployment "tasktracker-database" exceeded its progress deadline
+apps   Deployment             dso202-staging  tasktracker-backend           OutOfSync  Missing         
+apps   Deployment             dso202-staging  tasktracker-frontend          OutOfSync  Missing
+
 $ argocd app diff tasktracker-staging
-<!-- PASTE OUTPUT -->
-$ argocd app sync tasktracker-staging
-<!-- PASTE OUTPUT: back to 1 replica, Synced -->
+===== apps/Deployment dso202-staging/tasktracker-backend ======
+0a1,82
+> apiVersion: apps/v1
+> kind: Deployment
+> metadata:
+>   annotations:
+>     argocd.argoproj.io/sync-wave: "1"
+>     argocd.argoproj.io/tracking-id: tasktracker-staging:apps/Deployment:dso202-staging/tasktracker-backend
+>   labels:
+>     app.kubernetes.io/instance: tasktracker
+>     app.kubernetes.io/managed-by: Helm
+>     app.kubernetes.io/part-of: task-tracker
+>     app.kubernetes.io/version: "1.0"
+>     helm.sh/chart: task-tracker-0.2.0
+>     tier: backend
+>   name: tasktracker-backend
+>   namespace: dso202-staging
+> spec:
+>   progressDeadlineSeconds: 120
+>   replicas: 1
+>   selector:
+>     matchLabels:
+>       app: tasktracker-backend
+>       tier: backend
+>   template:
+>     metadata:
+>       annotations:
+>         checksum/config: 8557348fbd27c062deb045f013fd472eb36f09676698e2eabcc0b54457553df6
+>       labels:
+>         app: tasktracker-backend
+>         tier: backend
+>     spec:
+>       containers:
+>       - env:
+>         - name: DB_HOST
+>           valueFrom:
+>             configMapKeyRef:
+>               key: DB_HOST
+>               name: tasktracker-config
+>         - name: DB_PORT
+>           valueFrom:
+>             configMapKeyRef:
+>               key: DB_PORT
+>               name: tasktracker-config
+>         - name: DB_NAME
+>           valueFrom:
+>             configMapKeyRef:
+>               key: DB_NAME
+>               name: tasktracker-config
+>         - name: APP_PORT
+>           valueFrom:
+>             configMapKeyRef:
+>               key: APP_PORT
+>               name: tasktracker-config
+>         - name: DB_USER
+>           valueFrom:
+>             secretKeyRef:
+>               key: DB_USER
+>               name: tasktracker-credentials
+>         - name: DB_PASSWORD
+>           valueFrom:
+>             secretKeyRef:
+>               key: DB_PASSWORD
+>               name: tasktracker-credentials
+>         image: sarojsanyasi/dso202-backend:1.0
+>         imagePullPolicy: IfNotPresent
+>         name: backend
+>         ports:
+>         - containerPort: 8080
+>           name: http
+>         readinessProbe:
+>           failureThreshold: 6
+>           httpGet:
+>             path: /api/status
+>             port: 8080
+>           initialDelaySeconds: 5
+>           periodSeconds: 5
+>         resources:
+>           limits:
+>             cpu: 750m
+>             memory: 768Mi
+>           requests:
+>             cpu: 200m
+>             memory: 256Mi
+
 ```
-
-**Result:** <!-- WRITE: explained by no automated sync policy on staging -->
-
-### Drill 3: pruning
-
-**Prediction:** <!-- WRITE -->
-
-```text
-# commit <sha>: add platform/dev/prune-drill.yaml
-$ kubectl get configmap prune-drill -n dso202-dev
-<!-- PASTE OUTPUT: exists -->
-
-# commit <sha>: git rm platform/dev/prune-drill.yaml
-$ kubectl get configmap prune-drill -n dso202-dev
-<!-- PASTE OUTPUT: Error from server (NotFound) -->
-```
-
-**Result:** <!-- WRITE: explained by prune: true on platform-dev -->
-
-### Drill 4: project guardrail
-
-**Prediction:** <!-- WRITE -->
-
-```text
-# commit <sha>: drill.quota: true in environments/dev/values.yaml
-$ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: sync failed - resource :ResourceQuota is not permitted in project dso202 -->
-
-# commit <sha>: git revert
-$ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: Synced / Healthy -->
-```
-
-**Result:** <!-- WRITE: explained by namespaceResourceWhitelist in argocd/projects/dso202.yaml -->
-
----
 
 ## Task 9 — Rebuild from Git
 
 ### Before the rebuild
 
 ```text
-$ git rev-parse HEAD
-<!-- PASTE -->
 $ kubectl get applications -n argocd
-<!-- PASTE -->
+NAME                  SYNC STATUS   HEALTH STATUS
+platform-dev          Synced        Healthy
+platform-staging      Synced        Healthy
+root                  Synced        Degraded
+sealed-secrets        Synced        Healthy
+tasktracker-dev       OutOfSync     Degraded
+tasktracker-staging   OutOfSync     Degraded
 ```
-
-### Steps 1–8 (README §3)
-
-```text
-$ date
-<!-- PASTE start time -->
-<!-- PASTE OUTPUT of every command in README §3, steps 1–8 -->
-$ date
-<!-- PASTE end time -->
-```
-
-**Elapsed time:** <!-- mm:ss -->
 
 ### Order in which Applications became Healthy
 
 ```text
-$ watch -n 5 kubectl get applications -n argocd     # or: argocd app list repeatedly
-<!-- PASTE OUTPUT / list: dso202 project → sealed-secrets → platform-dev, platform-staging → tasktracker-dev → tasktracker-staging (after manual sync) -->
+$ watch -n 5 kubectl get applications -n argocd
+Every 5.0s: kubectl get applications -n argocd                                                          linux-os: Thu Nov 19 02:25:01 2026
+
+NAME                  SYNC STATUS   HEALTH STATUS
+platform-dev          Synced        Healthy
+platform-staging      Synced        Healthy
+root                  Synced        Degraded
+sealed-secrets        Synced        Healthy
+tasktracker-dev       OutOfSync     Degraded
+tasktracker-staging   OutOfSync     Degraded
 ```
 
 ### Secrets decrypted with the restored key (no re-sealing)
@@ -639,31 +762,8 @@ $ watch -n 5 kubectl get applications -n argocd     # or: argocd app list repeat
 ```text
 $ kubectl get secret tasktracker-credentials -n dso202-dev
 $ kubectl get secret tasktracker-credentials -n dso202-staging
-<!-- PASTE OUTPUT -->
 ```
+![image](../screenshots/task9.png)
 
-### Smoke tests and one test task per environment
 
-```text
-$ kubectl logs job/tasktracker-dev-smoke-test -n dso202-dev
-$ kubectl logs job/tasktracker-staging-smoke-test -n dso202-staging
-<!-- PASTE OUTPUT -->
-```
 
-<!-- SCREENSHOT: one test task created in dev (http://localhost:30080) and one in staging (http://localhost:8081) -->
-
-Q6: see README §6.
-
----
-
-## Task 10 — Bonus: Multi-Source Application
-
-```text
-$ argocd app get tasktracker-dev
-<!-- PASTE OUTPUT: two sources (chart path + ref: values), Synced / Healthy -->
-
-$ kubectl get pods -n dso202-dev
-<!-- PASTE OUTPUT: no restarts; rendered manifests identical, so nothing was replaced -->
-```
-
-<!-- SCREENSHOT: UI → tasktracker-dev → App Details showing both sources -->
