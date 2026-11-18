@@ -1,0 +1,48 @@
+# =============================================================================
+# File        : platform/dev/rbac.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit I 1.5.1 - namespace-scoped RBAC, carried over from
+#               Assignment 2 (Kubernetes RBAC, distinct from Argo CD's own
+#               RBAC in bootstrap/argocd/argocd-rbac-cm-patch.yaml)
+# Purpose     : A read-only ServiceAccount/Role/RoleBinding for dso202-dev,
+#               unrelated to how the Task Tracker Pods run (they use the
+#               namespace default ServiceAccount). Demonstrates
+#               namespace-scoped least privilege as in Assignment 2.
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: task-tracker-app
+  namespace: dso202-dev
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: task-tracker-observer
+  namespace: dso202-dev
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: task-tracker-readonly
+  namespace: dso202-dev
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: task-tracker-readonly-binding
+  namespace: dso202-dev
+subjects:
+  - kind: ServiceAccount
+    name: task-tracker-observer
+    namespace: dso202-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: task-tracker-readonly

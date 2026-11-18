@@ -1,0 +1,31 @@
+# =============================================================================
+# File        : environments/dev/values.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.1 - Helm values per Application source
+# Purpose     : Everything that differs in dev from charts/tasktracker/values.yaml.
+#               Dev tracks main (argocd/applications/tasktracker-dev.yaml), so
+#               a change here is deployed automatically on the next poll.
+# =============================================================================
+existingSecret: tasktracker-credentials
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+  service:
+    nodePort: 30080
+
+backend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+  external:
+    nodePort: 32081
+
+database:
+  image:
+    tag: "1.0"
+
+config:
+  corsOrigin: http://localhost:30080
+  backendUrl: http://localhost:32081

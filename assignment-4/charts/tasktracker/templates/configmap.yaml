@@ -1,0 +1,20 @@
+# =============================================================================
+# File        : charts/tasktracker/templates/configmap.yaml
+# Assignment  : DSO202 Assignment 4 (carried over from Assignment 3, unchanged)
+# Purpose     : Non-secret per-tier configuration (C2): changing one of these
+#               values requires a commit to environments/<env>/values.yaml
+#               only, never a template edit.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "task-tracker.configName" . }}
+  labels: {{- include "task-tracker.labels" . | nindent 4 }}
+data:
+  DB_HOST: {{ include "task-tracker.fullname" . }}-database
+  DB_PORT: {{ .Values.database.port | quote }}
+  DB_NAME: {{ .Values.config.dbName | quote }}
+  APP_PORT: {{ .Values.config.appPort | quote }}
+  CORS_ORIGIN: {{ .Values.config.corsOrigin | quote }}
+  POSTGRES_DB: {{ .Values.config.dbName | quote }}
+  BACKEND_URL: {{ .Values.config.backendUrl | quote }}

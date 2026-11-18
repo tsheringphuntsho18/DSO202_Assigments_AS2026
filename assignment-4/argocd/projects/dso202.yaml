@@ -1,0 +1,57 @@
+# =============================================================================
+# File        : argocd/projects/dso202.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.4.1 - AppProjects: source and destination rules
+# Purpose     : The workload project. It confines the Task Tracker Applications
+#               to one repository, two namespaces, and an explicit list of
+#               resource kinds. A manifest outside these limits is rejected at
+#               sync time, whoever committed it.
+#
+# Whitelist derivation (Task 3, step 1): 'helm template' against both
+# environments (Task 1, step 6) renders exactly ConfigMap, Deployment, Job,
+# PersistentVolumeClaim and Service - no more, no less. PersistentVolumeClaim
+# is added below with a comment, as the brief allows; StatefulSet and
+# ServiceAccount are left out because this chart renders neither.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dso202
+  namespace: argocd
+  annotations:
+    # Wave -3: the project must exist before any Application that refers to it.
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  description: Task Tracker workloads for the dev and staging environments
+
+  sourceRepos:
+    - https://github.com/tsheringphuntsho18/DSO202_Assigments_AS2026.git
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: dso202-dev
+    - server: https://kubernetes.default.svc
+      namespace: dso202-staging
+
+  # An empty list permits no cluster-scoped kinds at all: this project cannot
+  # create namespaces, ClusterRoles, or CustomResourceDefinitions.
+  clusterResourceWhitelist: []
+
+  # Only these namespaced kinds may be deployed. The list is built from the
+  # output of 'helm template' (Task 1, step 6) and names exactly the kinds the
+  # chart renders, including the Job used as a hook. ResourceQuota, LimitRange,
+  # Role, RoleBinding, and SealedSecret are absent on purpose: they belong to
+  # the platform layer, so the workload project cannot loosen its own limits.
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: batch
+      kind: Job
+    # Added beyond the baseline listing: the database tier's PVC
+    # (charts/tasktracker/templates/database.yaml) is rendered by this chart.
+    - group: ""
+      kind: PersistentVolumeClaim

@@ -1,0 +1,91 @@
+# =============================================================================
+# File        : charts/tasktracker/templates/backend.yaml
+# Assignment  : DSO202 Assignment 4 (carried over from Assignment 3)
+# Descriptor  : Unit IV 4.3.2 (sync waves), 4.3.3 (health checks)
+# Purpose     : Backend tier. Credentials come from .Values.existingSecret
+#               (chart contract C3), a Secret that Sealed Secrets decrypts in
+#               the namespace before this Application syncs - the chart never
+#               renders a Secret itself. Readiness is GET /api/status (C4);
+#               sync-wave "1" places it after the database and before the
+#               frontend (C5); progressDeadlineSeconds shortens how long a
+#               failed rollout takes to report Degraded (C6).
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-tracker.fullname" . }}-backend
+  labels:
+    tier: backend
+    {{- include "task-tracker.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  progressDeadlineSeconds: 120
+  selector:
+    matchLabels: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "backend") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.containerPort }}
+          env:
+            {{- range $k := list "DB_HOST" "DB_PORT" "DB_NAME" "APP_PORT" }}
+            - name: {{ $k }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "task-tracker.configName" $ }}
+                  key: {{ $k }}
+            {{- end }}
+            {{- range $k := list "DB_USER" "DB_PASSWORD" }}
+            - name: {{ $k }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "task-tracker.secretName" $ }}
+                  key: {{ $k }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: {{ .Values.backend.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 6
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-tracker.fullname" . }}-backend
+  labels:
+    tier: backend
+    {{- include "task-tracker.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "backend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: {{ .Values.backend.containerPort }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "task-tracker.fullname" . }}-backend-external
+  labels: {{- include "task-tracker.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  selector: {{- include "task-tracker.selectorLabels" (dict "root" . "tier" "backend") | nindent 4 }}
+  ports:
+    - protocol: TCP
+      port: {{ .Values.backend.external.port }}
+      targetPort: {{ .Values.backend.containerPort }}
+      nodePort: {{ .Values.backend.external.nodePort }}

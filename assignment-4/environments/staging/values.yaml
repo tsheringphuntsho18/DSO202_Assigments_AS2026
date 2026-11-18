@@ -1,0 +1,37 @@
+# =============================================================================
+# File        : environments/staging/values.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.1 - Helm values per Application source
+# Purpose     : Everything that differs in staging from charts/tasktracker/values.yaml.
+#               Staging is read only at the tag named by
+#               argocd/applications/tasktracker-staging.yaml's targetRevision,
+#               and only applied when a person runs 'argocd app sync'. The
+#               frontend and backend NodePorts differ from dev (30081/32082)
+#               because both environments run on the same cluster at once and
+#               a NodePort can be allocated to only one Service cluster-wide.
+#               Neither port is mapped by kind to a host port, so both tiers
+#               are reached with 'kubectl port-forward' (section 6.3).
+# =============================================================================
+existingSecret: tasktracker-credentials
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+  service:
+    nodePort: 30081
+
+backend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+  external:
+    nodePort: 32082
+
+database:
+  image:
+    tag: "1.0"
+
+config:
+  corsOrigin: http://localhost:8081
+  backendUrl: http://localhost:32082

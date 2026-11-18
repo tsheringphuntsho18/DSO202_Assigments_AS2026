@@ -1,0 +1,65 @@
+# =============================================================================
+# File        : charts/tasktracker/templates/smoke-test-job.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.2 - sync waves and hooks; 4.3.3 - health checks
+# Purpose     : A PostSync hook. Argo CD creates this Job only after every
+#               resource in the sync has been applied and is Healthy. If the
+#               Job fails, the sync is marked as failed.
+# Note        : Helm ignores the argocd.argoproj.io annotations, so
+#               'helm template' and 'helm install' still render this Job as an
+#               ordinary Job.
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-smoke-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    # BeforeHookCreation removes the previous run's Job just before the next
+    # run creates a new one, so the most recent result stays available for
+    # 'kubectl logs' between syncs.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: smoke-test
+          image: busybox:1.37
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # Requests are stated because the namespace ResourceQuota requires
+          # them on every Pod.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Ten attempts, three seconds apart. The Service name is the
+              # backend ClusterIP Service this chart renders in backend.yaml:
+              # {{ include "task-tracker.fullname" . }}-backend. GET /api/tasks
+              # reaches the database, so success proves the backend, the
+              # Service, and the database are working together.
+              for attempt in 1 2 3 4 5 6 7 8 9 10; do
+                if wget -q -T 3 -O - http://{{ include "task-tracker.fullname" . }}-backend:{{ .Values.backend.service.port }}/api/tasks; then
+                  exit 0
+                fi
+                echo "attempt ${attempt} failed"
+                sleep 3
+              done
+              exit 1
